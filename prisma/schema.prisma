@@ -4,10 +4,121 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum VolumeStatus {
+  AVAILABLE
+  RENTED
+  DAMAGED
+}
+
+enum RentalStatus {
+  ACTIVE
+  RETURNED
+  OVERDUE
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  phone        String?
+  role         Role      @default(CUSTOMER)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  rentals       Rental[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Manga {
+  id           String   @id @default(uuid())
+  title        String
+  author       String
+  genre        String
+  totalVolumes Int      @map("total_volumes")
+  coverUrl     String?  @map("cover_url")
+  description  String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  volumes MangaVolume[]
+
+  @@map("manga")
+}
+
+model MangaVolume {
+  id           String       @id @default(uuid())
+  mangaId      String       @map("manga_id")
+  volumeNumber Int          @map("volume_number")
+  status       VolumeStatus @default(AVAILABLE)
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  manga   Manga    @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+  rentals Rental[]
+
+  @@unique([mangaId, volumeNumber])
+  @@map("manga_volumes")
+}
+
+model PriceList {
+  id          String   @id @default(uuid())
+  durationDays Int     @map("duration_days")
+  price       Decimal  @db.Decimal(10, 2)
+  finePerDay  Decimal  @map("fine_per_day") @db.Decimal(10, 2)
+  isActive    Boolean  @default(true) @map("is_active")
+
+  rentals Rental[]
+
+  @@map("price_lists")
+}
+
+model Rental {
+  id          String       @id @default(uuid())
+  userId      String       @map("user_id")
+  volumeId    String       @map("volume_id")
+  priceListId String       @map("price_list_id")
+  rentDate    DateTime     @default(now()) @map("rent_date")
+  dueDate     DateTime     @map("due_date")
+  returnDate  DateTime?    @map("return_date")
+  status      RentalStatus @default(ACTIVE)
+  fineAmount  Decimal      @default(0) @map("fine_amount") @db.Decimal(10, 2)
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  user      User        @relation(fields: [userId], references: [id])
+  volume    MangaVolume @relation(fields: [volumeId], references: [id])
+  priceList PriceList   @relation(fields: [priceListId], references: [id])
+
+  @@map("rentals")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String   // due_soon | overdue | rental_confirmed | info
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }
