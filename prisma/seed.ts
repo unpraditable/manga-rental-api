@@ -4,58 +4,27 @@ import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-// ── MAL IDs (MyAnimeList) ─────────────────────────────────────────────────────
-// Cara cek/update ID: buka myanimelist.net → cari manga → lihat angka di URL
-// Contoh: https://myanimelist.net/manga/13/One_Piece → ID = 13
-const MAL_IDS: Record<string, number> = {
-  'One Piece': 13,
-  Naruto: 11,
-  'Attack on Titan': 23390,
-  Bleach: 12,
-  'Haikyuu!!': 31347,
-  'Jujutsu Kaisen': 113138,
-  'Dragon Ball': 42,
-  'Demon Slayer': 87216,
-  Monster: 1668,
-  '20th Century Boys': 6,
-  Pluto: 2022,
-  "Frieren: Beyond Journey's End": 126287,
-  'Oshi no Ko': 126146,
-  'Kurosagi (The Black Swindler)': 4088,
-  'Giant Killing': 6304,
-  'Ao Ashi': 98478,
-  Medalist: 148103,
+const COVER_URLS: Record<string, string> = {
+  'One Piece': 'https://cdn.myanimelist.net/images/manga/2/253146l.jpg',
+  Naruto: 'https://cdn.myanimelist.net/images/manga/3/117681l.jpg',
+  'Attack on Titan': 'https://cdn.myanimelist.net/images/manga/2/37846l.jpg',
+  Bleach: 'https://myanimelist.net/images/manga/3/180031l.jpg', // ← paste URL dari MAL
+  'Haikyuu!!': 'https://myanimelist.net/images/manga/2/258225l.jpg',
+  'Jujutsu Kaisen': 'https://myanimelist.net/images/manga/3/210341l.jpg',
+  'Dragon Ball': 'https://myanimelist.net/images/manga/1/267793l.jpg',
+  'Demon Slayer': 'https://myanimelist.net/images/manga/3/179023l.jpg',
+  Monster: 'https://myanimelist.net/images/manga/3/258224.jpg',
+  '20th Century Boys': 'https://myanimelist.net/images/manga/5/260006.jpg',
+  Pluto: 'https://myanimelist.net/images/manga/1/264496.jpg',
+  "Frieren: Beyond Journey's End":
+    'https://myanimelist.net/images/manga/3/232121l.jpg',
+  'Oshi no Ko': 'https://myanimelist.net/images/manga/3/233991l.jpg',
+  'Kurosagi (The Black Swindler)':
+    'https://myanimelist.net/images/manga/2/161298.jpg',
+  'Giant Killing': 'https://myanimelist.net/images/manga/3/147425l.jpg',
+  'Ao Ashi': 'https://myanimelist.net/images/manga/1/185325.jpg',
+  Medalist: 'https://myanimelist.net/images/manga/3/235204l.jpg',
 };
-
-// ── Fetch cover dari Jikan API (wrapper MyAnimeList, gratis, no auth) ─────────
-// Docs: https://docs.api.jikan.moe
-async function fetchCoverFromMAL(malId: number): Promise<string | null> {
-  try {
-    const res = await fetch(`https://api.jikan.moe/v4/manga/${malId}`, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(10_000),
-    });
-
-    if (!res.ok) {
-      console.warn(`    ⚠ MAL API ${res.status} untuk ID ${malId}`);
-      return null;
-    }
-
-    const json = (await res.json()) as {
-      data?: {
-        images?: { jpg?: { large_image_url?: string; image_url?: string } };
-      };
-    };
-
-    return (
-      json.data?.images?.jpg?.large_image_url ??
-      json.data?.images?.jpg?.image_url ??
-      null
-    );
-  } catch {
-    return null;
-  }
-}
 
 // ── Data manga ────────────────────────────────────────────────────────────────
 const mangaData = [
@@ -257,9 +226,6 @@ async function main() {
   // Manga + covers
   console.log('📚 Fetching covers dari MyAnimeList (Jikan API)...\n');
 
-  let coverOk = 0;
-  let coverFail = 0;
-
   for (const data of mangaData) {
     const mangaId = data.title
       .toLowerCase()
@@ -267,26 +233,8 @@ async function main() {
       .trim()
       .replace(/\s+/g, '-');
 
-    const malId = MAL_IDS[data.title];
-
     // Fetch cover
-    let coverUrl: string | null = null;
-    if (malId) {
-      process.stdout.write(`  [${malId}] ${data.title} ... `);
-      coverUrl = await fetchCoverFromMAL(malId);
-      if (coverUrl) {
-        console.log('✓');
-        coverOk++;
-      } else {
-        console.log('✗');
-        coverFail++;
-      }
-      // Jikan rate limit aman di 400ms antar request
-      await new Promise((r) => setTimeout(r, 400));
-    } else {
-      console.log(`  [—] ${data.title} — tidak ada MAL ID`);
-      coverFail++;
-    }
+    const coverUrl = COVER_URLS[data.title] || null;
 
     const seededVolumes = Math.min(data.totalVolumes, 10);
 
@@ -319,7 +267,6 @@ async function main() {
   console.log(
     `    Volumes : ${mangaData.reduce((s, m) => s + Math.min(m.totalVolumes, 10), 0)} total`,
   );
-  console.log(`    Cover   : ${coverOk} ✓  ${coverFail} ✗`);
   console.log('\n📋  Test credentials:');
   console.log(`    Customer : budi@email.com / password123`);
   console.log(`    Admin    : admin@mangarental.com / password123`);
